@@ -2,6 +2,9 @@ package com.shivafamily.smstogglecontroller
 
 import android.Manifest
 import android.app.NotificationManager
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.PendingIntent
 import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -11,6 +14,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.os.Build
 import android.provider.Telephony
+import android.provider.Settings
 import android.telephony.PhoneNumberUtils
 import android.util.Log
 
@@ -36,7 +40,48 @@ class SmsCommandReceiver : BroadcastReceiver() {
             "LIGHT" -> toggleFlashlight(context)
             "BLUETOOTH" -> toggleBluetooth(context)
             "DND" -> toggleDoNotDisturb(context)
+            "LOCATION" -> openLocationSettingsNotice(context)
             else -> Log.i(TAG, "Ignored SMS: unknown action.")
+        }
+    }
+
+
+    private fun openLocationSettingsNotice(context: Context) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "Notification permission is missing; open the app and allow notifications.")
+            return
+        }
+        try {
+            val channelId = "location_settings"
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                manager.createNotificationChannel(
+                    NotificationChannel(channelId, "Location settings requests", NotificationManager.IMPORTANCE_HIGH)
+                )
+            }
+            val settingsIntent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            val pendingIntent = PendingIntent.getActivity(context, 2001, settingsIntent, pendingFlags)
+            val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(context, channelId)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(context)
+            }
+            val notification = builder
+                .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                .setContentTitle("Location settings")
+                .setContentText("Tap here to open Location settings and turn Location on.")
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .build()
+            manager.notify(2001, notification)
+        } catch (error: Exception) {
+            Log.e(TAG, "Could not show Location settings notification.", error)
         }
     }
 
