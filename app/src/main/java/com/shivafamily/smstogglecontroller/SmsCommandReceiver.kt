@@ -1,6 +1,7 @@
 package com.shivafamily.smstogglecontroller
 
 import android.Manifest
+import android.app.NotificationManager
 import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -20,13 +21,12 @@ class SmsCommandReceiver : BroadcastReceiver() {
         val prefs = context.getSharedPreferences("controller_settings", Context.MODE_PRIVATE)
         val trustedNumber = prefs.getString(MainActivity.KEY_PHONE, null) ?: return
         val expectedPin = prefs.getString(MainActivity.KEY_COMMAND, null) ?: return
-
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         val sender = messages.firstOrNull()?.originatingAddress ?: return
         val body = messages.joinToString(separator = "") { it.messageBody ?: "" }.trim()
         val parts = body.split(Regex("\\s+"), limit = 2)
-        if (!PhoneNumberUtils.compare(sender, trustedNumber) ||
-            parts.size != 2 ||
+
+        if (!PhoneNumberUtils.compare(sender, trustedNumber) || parts.size != 2 ||
             !parts[0].equals(expectedPin, ignoreCase = true)) {
             Log.i(TAG, "Ignored SMS: sender or PIN did not match.")
             return
@@ -35,30 +35,26 @@ class SmsCommandReceiver : BroadcastReceiver() {
         when (parts[1].trim().uppercase()) {
             "LIGHT" -> toggleFlashlight(context)
             "BLUETOOTH" -> toggleBluetooth(context)
+            "DND" -> toggleDoNotDisturb(context)
             else -> Log.i(TAG, "Ignored SMS: unknown action.")
         }
     }
 
     private fun toggleFlashlight(context: Context) {
         if (context.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            Log.w(TAG, "Camera permission is missing; flashlight command was not run.")
+            Log.w(TAG, "Camera permission is missing.")
             return
         }
         try {
             val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-            val flashCameraId = cameraManager.cameraIdList.firstOrNull { id ->
-                cameraManager.getCameraCharacteristics(id)
-                    .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
-            } ?: run {
-                Log.w(TAG, "No flash unit is available on this device.")
-                return
-            }
-
+            val flashId = cameraManager.cameraIdList.firstOrNull { id ->
+                cameraManager.getCameraCharacteristics(id).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            } ?: return
             val prefs = context.getSharedPreferences("controller_settings", Context.MODE_PRIVATE)
-            val isCurrentlyOn = prefs.getBoolean(KEY_FLASHLIGHT_ON, false)
-            cameraManager.setTorchMode(flashCameraId, !isCurrentlyOn)
-            prefs.edit().putBoolean(KEY_FLASHLIGHT_ON, !isCurrentlyOn).apply()
-            Log.i(TAG, "Authorized flashlight toggle command completed.")
+            val next = !prefs.getBoolean(KEY_FLASHLIGHT_ON, false)
+            cameraManager.setTorchMode(flashId, next)
+            prefs.edit().putBoolean(KEY_FLASHLIGHT_ON, next).apply()
+            Log.i(TAG, "Flashlight toggle request completed.")
         } catch (error: Exception) {
             Log.e(TAG, "Flashlight toggle failed.", error)
         }
@@ -72,21 +68,31 @@ class SmsCommandReceiver : BroadcastReceiver() {
             return
         }
         try {
-            val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-            val adapter = manager.adapter ?: run {
-                Log.w(TAG, "Bluetooth is not supported on this device.")
+            val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter ?: return
+            val accepted = if (adapter.isEnabled) adapter.disable() else adapter.enable()
+            if (!accepted) Log.w(TAG, "Bluetooth toggle rejected by Android or device firmware.")
+        } catch (error: Exception) {
+            Log.e(TAG, "Bluetooth toggle failed or is restricted by Android.", error)
+        }
+    }
+
+    private fun toggleDoNotDisturb(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (!manager.isNotificationPolicyAccessGranted) {
+                Log.w(TAG, "Grant Do Not Disturb access in the app first.")
                 return
             }
-            val accepted = if (adapter.isEnabled) adapter.disable() else adapter.enable()
-            if (accepted) {
-                Log.i(TAG, "Bluetooth toggle request accepted.")
+            val nextFilter = if (manager.currentInterruptionFilter == NotificationManager.INTERRUPTION_FILTER_ALL) {
+                NotificationManager.INTERRUPTION_FILTER_NONE
             } else {
-                Log.w(TAG, "Android or the device manufacturer rejected the Bluetooth toggle request.")
+                NotificationManager.INTERRUPTION_FILTER_ALL
             }
-        } catch (error: SecurityException) {
-            Log.e(TAG, "Bluetooth permission or OS restriction prevented the toggle.", error)
+            manager.setInterruptionFilter(nextFilter)
+            Log.i(TAG, "Do Not Disturb filter change requested.")
         } catch (error: Exception) {
-            Log.e(TAG, "Bluetooth toggle failed.", error)
+            Log.e(TAG, "Do Not Disturb toggle failed.", error)
         }
     }
 
