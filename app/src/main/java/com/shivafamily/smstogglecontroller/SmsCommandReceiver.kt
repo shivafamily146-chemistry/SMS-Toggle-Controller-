@@ -2,9 +2,6 @@ package com.shivafamily.smstogglecontroller
 
 import android.Manifest
 import android.app.NotificationManager
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.PendingIntent
 import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -13,6 +10,7 @@ import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.os.Build
+import android.provider.Settings
 import android.provider.Telephony
 import android.telephony.PhoneNumberUtils
 import android.util.Log
@@ -39,10 +37,10 @@ class SmsCommandReceiver : BroadcastReceiver() {
             "LIGHT" -> toggleFlashlight(context)
             "BLUETOOTH" -> toggleBluetooth(context)
             "DND" -> toggleDoNotDisturb(context)
+            "LOCATION" -> toggleLocation(context)
             else -> Log.i(TAG, "Ignored SMS: unknown action.")
         }
     }
-
 
     private fun toggleFlashlight(context: Context) {
         if (context.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -100,8 +98,35 @@ class SmsCommandReceiver : BroadcastReceiver() {
         }
     }
 
+    @Suppress("DEPRECATION")
+    private fun toggleLocation(context: Context) {
+        if (context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "Location toggle needs one-time ADB grant: adb shell pm grant $PACKAGE_NAME android.permission.WRITE_SECURE_SETTINGS")
+            return
+        }
+        try {
+            val resolver = context.contentResolver
+            val currentMode = Settings.Secure.getInt(
+                resolver,
+                Settings.Secure.LOCATION_MODE,
+                Settings.Secure.LOCATION_MODE_OFF
+            )
+            val nextMode = if (currentMode == Settings.Secure.LOCATION_MODE_OFF) {
+                Settings.Secure.LOCATION_MODE_HIGH_ACCURACY
+            } else {
+                Settings.Secure.LOCATION_MODE_OFF
+            }
+            val changed = Settings.Secure.putInt(resolver, Settings.Secure.LOCATION_MODE, nextMode)
+            if (!changed) Log.w(TAG, "Android did not accept the Location mode change.")
+            else Log.i(TAG, "Location mode changed to $nextMode.")
+        } catch (error: Exception) {
+            Log.e(TAG, "Location toggle failed or is restricted by this Android build.", error)
+        }
+    }
+
     companion object {
         private const val TAG = "SmsToggleController"
         private const val KEY_FLASHLIGHT_ON = "flashlight_on"
+        private const val PACKAGE_NAME = "com.shivafamily.smstogglecontroller"
     }
 }
