@@ -26,7 +26,7 @@ class MainActivity : Activity() {
             textSize = 24f
         }
         val help = TextView(this).apply {
-            text = "Set one trusted sender and the command text. Only matching messages will be considered."
+            text = "Enter the trusted sender number and secret SMS command. The first supported action will be FLASHLIGHT (LIGHT)."
             textSize = 15f
         }
         val phoneInput = EditText(this).apply {
@@ -64,14 +64,18 @@ class MainActivity : Activity() {
         layout.addView(saveButton)
         setContentView(layout)
 
-        if (checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.RECEIVE_SMS), REQUEST_SMS_PERMISSION)
+        val permissions = arrayOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.CAMERA)
+        val missing = permissions.filter {
+            checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isNotEmpty()) {
+            requestPermissions(missing.toTypedArray(), REQUEST_PERMISSIONS)
         }
     }
 
     companion object {
         const val KEY_PHONE = "trusted_phone"
         const val KEY_COMMAND = "secret_command"
-        const val REQUEST_SMS_PERMISSION = 1001
+        const val REQUEST_PERMISSIONS = 1001
     }
 }
