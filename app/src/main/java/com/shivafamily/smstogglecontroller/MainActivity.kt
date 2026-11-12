@@ -2,9 +2,11 @@ package com.shivafamily.smstogglecontroller
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -27,7 +29,7 @@ class MainActivity : Activity() {
             textSize = 24f
         }
         val help = TextView(this).apply {
-            text = "Set one trusted sender and a secret PIN. Send: PIN LIGHT or PIN BLUETOOTH. Example: 4826 LIGHT"
+            text = "Set one trusted sender and a secret PIN. Send: PIN LIGHT, PIN BLUETOOTH, or PIN DND. Example: 4826 LIGHT"
             textSize = 15f
         }
         val phoneInput = EditText(this).apply {
@@ -37,7 +39,7 @@ class MainActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_PHONE
         }
         val pinInput = EditText(this).apply {
-            hint = "Secret PIN (example: 4826)"
+            hint = "Secret PIN (at least 4 digits)"
             setSingleLine(true)
             setText(prefs.getString(KEY_COMMAND, ""))
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
@@ -50,11 +52,16 @@ class MainActivity : Activity() {
                 if (phone.isBlank() || pin.length < 4) {
                     Toast.makeText(this@MainActivity, "Enter a phone number and a PIN with at least 4 digits.", Toast.LENGTH_SHORT).show()
                 } else {
-                    prefs.edit()
-                        .putString(KEY_PHONE, phone)
-                        .putString(KEY_COMMAND, pin)
-                        .apply()
+                    prefs.edit().putString(KEY_PHONE, phone).putString(KEY_COMMAND, pin).apply()
                     Toast.makeText(this@MainActivity, "Settings saved on this phone.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        val dndAccessButton = Button(this).apply {
+            text = "Grant Do Not Disturb access"
+            setOnClickListener {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
                 }
             }
         }
@@ -64,21 +71,13 @@ class MainActivity : Activity() {
         layout.addView(phoneInput)
         layout.addView(pinInput)
         layout.addView(saveButton)
+        layout.addView(dndAccessButton)
         setContentView(layout)
 
-        val permissions = mutableListOf(
-            Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.CAMERA
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
-        }
-        val missing = permissions.filter {
-            checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
-        }
-        if (missing.isNotEmpty()) {
-            requestPermissions(missing.toTypedArray(), REQUEST_PERMISSIONS)
-        }
+        val permissions = mutableListOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.CAMERA)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+        val missing = permissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), REQUEST_PERMISSIONS)
     }
 
     companion object {
