@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.InputFilter
+import android.telephony.PhoneNumberUtils
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -39,8 +41,9 @@ class MainActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_PHONE
         }
         val pinInput = EditText(this).apply {
-            hint = "Secret PIN (at least 4 digits)"
+            hint = "Secret PIN (4 to 12 digits)"
             setSingleLine(true)
+            filters = arrayOf(InputFilter.LengthFilter(12))
             setText(prefs.getString(KEY_COMMAND, ""))
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
         }
@@ -49,8 +52,15 @@ class MainActivity : Activity() {
             setOnClickListener {
                 val phone = phoneInput.text.toString().trim()
                 val pin = pinInput.text.toString().trim()
-                if (phone.isBlank() || pin.length < 4) {
-                    Toast.makeText(this@MainActivity, "Enter a phone number and a PIN with at least 4 digits.", Toast.LENGTH_SHORT).show()
+                val validPhone = PhoneNumberUtils.isGlobalPhoneNumber(phone) &&
+                    phone.count { it.isDigit() } >= 7
+                val validPin = pin.length in 4..12 && pin.all { it in '0'..'9' }
+                if (!validPhone || !validPin) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Enter a valid phone number and a PIN containing 4 to 12 digits.",
+                        Toast.LENGTH_LONG
+                    ).show()
                 } else {
                     prefs.edit().putString(KEY_PHONE, phone).putString(KEY_COMMAND, pin).apply()
                     Toast.makeText(this@MainActivity, "Settings saved on this phone.", Toast.LENGTH_SHORT).show()
