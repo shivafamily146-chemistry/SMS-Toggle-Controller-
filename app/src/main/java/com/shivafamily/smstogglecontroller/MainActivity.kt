@@ -3,6 +3,7 @@ package com.shivafamily.smstogglecontroller
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
@@ -26,7 +27,7 @@ class MainActivity : Activity() {
             textSize = 24f
         }
         val help = TextView(this).apply {
-            text = "Enter the trusted sender number and secret SMS command. The first supported action will be FLASHLIGHT (LIGHT)."
+            text = "Set one trusted sender and a secret PIN. Send: PIN LIGHT or PIN BLUETOOTH. Example: 4826 LIGHT"
             textSize = 15f
         }
         val phoneInput = EditText(this).apply {
@@ -35,22 +36,23 @@ class MainActivity : Activity() {
             setText(prefs.getString(KEY_PHONE, ""))
             inputType = android.text.InputType.TYPE_CLASS_PHONE
         }
-        val commandInput = EditText(this).apply {
-            hint = "Secret command, e.g. 4826 LIGHT"
+        val pinInput = EditText(this).apply {
+            hint = "Secret PIN (example: 4826)"
             setSingleLine(true)
             setText(prefs.getString(KEY_COMMAND, ""))
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
         }
         val saveButton = Button(this).apply {
             text = "Save settings"
             setOnClickListener {
                 val phone = phoneInput.text.toString().trim()
-                val command = commandInput.text.toString().trim()
-                if (phone.isBlank() || command.isBlank()) {
-                    Toast.makeText(this@MainActivity, "Enter both fields.", Toast.LENGTH_SHORT).show()
+                val pin = pinInput.text.toString().trim()
+                if (phone.isBlank() || pin.length < 4) {
+                    Toast.makeText(this@MainActivity, "Enter a phone number and a PIN with at least 4 digits.", Toast.LENGTH_SHORT).show()
                 } else {
                     prefs.edit()
                         .putString(KEY_PHONE, phone)
-                        .putString(KEY_COMMAND, command)
+                        .putString(KEY_COMMAND, pin)
                         .apply()
                     Toast.makeText(this@MainActivity, "Settings saved on this phone.", Toast.LENGTH_SHORT).show()
                 }
@@ -60,11 +62,17 @@ class MainActivity : Activity() {
         layout.addView(title)
         layout.addView(help)
         layout.addView(phoneInput)
-        layout.addView(commandInput)
+        layout.addView(pinInput)
         layout.addView(saveButton)
         setContentView(layout)
 
-        val permissions = arrayOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.CAMERA)
+        val permissions = mutableListOf(
+            Manifest.permission.RECEIVE_SMS,
+            Manifest.permission.CAMERA
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+        }
         val missing = permissions.filter {
             checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
         }
