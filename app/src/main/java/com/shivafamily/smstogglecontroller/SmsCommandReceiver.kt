@@ -3,6 +3,9 @@ package com.shivafamily.smstogglecontroller
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.provider.Telephony
 import android.telephony.PhoneNumberUtils
 import android.util.Log
@@ -19,18 +22,38 @@ class SmsCommandReceiver : BroadcastReceiver() {
         val sender = messages.firstOrNull()?.originatingAddress ?: return
         val body = messages.joinToString(separator = "") { it.messageBody ?: "" }.trim()
 
-        val senderMatches = PhoneNumberUtils.compare(sender, trustedNumber)
-        if (!senderMatches || !body.equals(expectedCommand, ignoreCase = true)) {
+        if (!PhoneNumberUtils.compare(sender, trustedNumber) ||
+            !body.equals(expectedCommand, ignoreCase = true)) {
             Log.i(TAG, "Ignored SMS: sender or command did not match.")
             return
         }
 
-        // No device setting is changed yet. Permission-aware action handling
-        // will be added in the next implementation step.
-        Log.i(TAG, "Authorized SMS command received.")
+        if (context.checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "Camera permission is missing; flashlight command was not run.")
+            return
+        }
+
+        try {
+            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val flashCameraId = cameraManager.cameraIdList.firstOrNull { id ->
+                cameraManager.getCameraCharacteristics(id)
+                    .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            } ?: run {
+                Log.w(TAG, "No flash unit is available on this device.")
+                return
+            }
+
+            val isCurrentlyOn = prefs.getBoolean(KEY_FLASHLIGHT_ON, false)
+            cameraManager.setTorchMode(flashCameraId, !isCurrentlyOn)
+            prefs.edit().putBoolean(KEY_FLASHLIGHT_ON, !isCurrentlyOn).apply()
+            Log.i(TAG, "Authorized flashlight toggle command completed.")
+        } catch (error: Exception) {
+            Log.e(TAG, "Flashlight toggle failed.", error)
+        }
     }
 
     companion object {
         private const val TAG = "SmsToggleController"
+        private const val KEY_FLASHLIGHT_ON = "flashlight_on"
     }
 }
