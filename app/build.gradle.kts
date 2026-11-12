@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.shivafamily.sms togglecontroller".replace(" ", "")
+    namespace = "com.shivafamily.smstogglecontroller"
     compileSdk = 35
 
     defaultConfig {
