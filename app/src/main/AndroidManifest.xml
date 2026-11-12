@@ -12,7 +12,7 @@
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:label="SMS Toggle Controller"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
