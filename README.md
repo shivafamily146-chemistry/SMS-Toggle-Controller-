@@ -21,7 +21,7 @@ Replace the example PIN with the PIN saved in the app:
 - Flashlight control requires camera/flash hardware and camera permission.
 - Bluetooth enable/disable is restricted on modern Android versions and may be rejected by the operating system or device manufacturer.
 - Do Not Disturb requires the user to grant Notification Policy access in Android Settings.
-- Ordinary third-party apps cannot freely toggle Airplane Mode, mobile data, Wi-Fi, or Location on current Android versions. This app must not report those restricted actions as successful.
+- Ordinary third-party apps cannot freely toggle Airplane Mode, mobile data, Wi-Fi, or Location on current Android versions. There is no universal SMS-only workaround that can automatically enable Location on every Android phone. This app does not claim to perform that restricted action.
 - SMS reception requires the user to grant SMS permission. Availability and distribution are subject to Android and app-store policies.
 
 ## Build
