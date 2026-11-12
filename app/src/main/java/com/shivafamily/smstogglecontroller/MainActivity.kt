@@ -31,7 +31,7 @@ class MainActivity : Activity() {
             textSize = 24f
         }
         val help = TextView(this).apply {
-            text = "Set one trusted sender and a secret PIN. Send: PIN LIGHT, PIN BLUETOOTH, or PIN DND. Example: 4826 LIGHT"
+            text = "Set one trusted sender and a secret PIN. Commands: PIN LIGHT, PIN BLUETOOTH, PIN DND, PIN LOCATION. Example: 4826 LOCATION opens Location settings."
             textSize = 15f
         }
         val phoneInput = EditText(this).apply {
@@ -86,6 +86,7 @@ class MainActivity : Activity() {
 
         val permissions = mutableListOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.CAMERA)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+        if (Build.VERSION.SDK_INT >= 33) permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         val missing = permissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), REQUEST_PERMISSIONS)
     }
